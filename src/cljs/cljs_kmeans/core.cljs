@@ -13,6 +13,26 @@
 (defn random-points []
   (take 200 (repeatedly random-point)))
 
+
+(defn distance [a b]
+  (.sqrt 
+    js/Math 
+    (+ 
+      (.pow js/Math  (-  (:x a)  (:x b)) 2)
+      (.pow js/Math  (-  (:y a)  (:y b)) 2))))
+
+(defn assign-colors [clusters]
+  (map (fn [cluster color] (assoc cluster :color color)) clusters cluster-colors))
+
+(defn assign-to-cluster [points centroids]
+  (->> (for [point points]
+    (apply min-key :distance 
+           (map (fn [centroid] 
+                  {:centroid centroid :point point :distance (distance centroid point)}) centroids)))
+     (group-by :centroid)
+     (map (fn [[centroid groups]] {:centroid centroid :points (map :point groups)}))
+     assign-colors))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Vars
 
@@ -21,22 +41,25 @@
 
 (defonce app-state
   (let [rps (random-points)
-        k 6]
+        k 6
+        centroids (take k rps)]
   (reagent/atom
    {:points rps
     :k k
     ; :clusters [{:centroid  {:x 1 :y 2}},  {:centroid  {:x 2 :y 1}}]
-    :clusters (map (fn [point] {:centroid point}) (take k rps))})))
+    :clusters (assign-to-cluster rps centroids)})))
 
-(defn circle [x y color]
-  [:circle {:r 2 :cx x :cy y :fill color}])
+(defn circle [x y color size]
+  [:circle {:r size :cx x :cy y :fill color}])
 
 (defn draw-points [points]
-  (map (fn [{:keys [x y]}] (circle x y "blue")) points))
+  (map (fn [{:keys [x y]}] (circle x y "black" 2)) points))
 
 (defn draw-clusters [clusters]
-  (let [centroids (map :centroid clusters)]
-    (map (fn [{:keys [x y]} color] (circle x y color)) centroids cluster-colors)))
+  (for [{:keys [centroid points color]} clusters]
+    (cons 
+      (circle (:x centroid) (:y centroid) color 4)
+      (map (fn [{:keys [x y]}] (circle x y color 2)) points))))
 
 (defn graph [ratom]
   [:svg {:x 0 :y 0 :width 1000 :height 500}
