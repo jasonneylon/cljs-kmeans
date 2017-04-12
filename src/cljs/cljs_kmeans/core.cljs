@@ -5,6 +5,8 @@
    ))
 
 
+(def cluster-colors ["red",  "range",  "yellow",  "green",  "purple",  "brown"])
+
 (defn random-point []
   {:x (rand-int 1000) :y (rand-int 500)})
 
@@ -18,23 +20,35 @@
   ^boolean js/goog.DEBUG)
 
 (defonce app-state
+  (let [rps (random-points)
+        k 6]
   (reagent/atom
-   {:text "Hello, what is your name? "
-    :points (random-points)}))
+   {:points rps
+    :k k
+    ; :clusters [{:centroid  {:x 1 :y 2}},  {:centroid  {:x 2 :y 1}}]
+    :clusters (map (fn [point] {:centroid point}) (take k rps))})))
 
 (defn circle [x y color]
   [:circle {:r 2 :cx x :cy y :fill color}])
 
+(defn draw-points [points]
+  (map (fn [{:keys [x y]}] (circle x y "blue")) points))
+
+(defn draw-clusters [clusters]
+  (let [centroids (map :centroid clusters)]
+    (map (fn [{:keys [x y]} color] (circle x y color)) centroids cluster-colors)))
+
 (defn graph [ratom]
   [:svg {:x 0 :y 0 :width 1000 :height 500}
-   (map (fn [{:keys [x y]}] (circle x y "blue")) (:points @ratom))])
+   ; (draw-points (:points @ratom))
+   (draw-clusters (:clusters @ratom))
+   ])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Page
 
 (defn page [ratom]
   [:div [:h1 "K-means"] (graph ratom)] )
-
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
