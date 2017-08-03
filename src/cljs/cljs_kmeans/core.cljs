@@ -32,7 +32,6 @@
      (map (fn [[centroid groups]] {:centroid centroid :points (map :point groups)}))
      assign-colors))
 
-
 (defn mean
   [numbers]
   (/  (apply + numbers)  (count numbers)))
@@ -47,17 +46,19 @@
 (defonce debug?
   ^boolean js/goog.DEBUG)
 
-(defonce app-state
+(defn initial-app-state
+  []
   (let [rps (random-points)
         k 6
         centroids (take k rps)]
-  (reagent/atom
-   {:points rps
-    :k k
-    :running false
-    :iteration 0
-    ; :clusters [{:centroid  {:x 1 :y 2}},  {:centroid  {:x 2 :y 1}}]
-    :clusters (assign-to-cluster rps centroids)})))
+    {:points rps
+     :k k
+     :running false
+     :iteration 0
+     :clusters (assign-to-cluster rps centroids)}))
+
+(defonce app-state
+ (reagent/atom (initial-app-state)))
 
 (defn circle [x y color size]
   [:circle {:r size :cx x :cy y :fill color}])
@@ -73,7 +74,6 @@
 
 (defn graph [ratom]
   [:svg {:x 0 :y 0 :width 1000 :height 500}
-   ; (draw-points (:points @ratom))
    (draw-clusters (:clusters @ratom))])
 
 
@@ -84,9 +84,6 @@
     (fn [clusters]
       (map #(assoc % :centroid (mean-point (:points %))) clusters))))
 
-(defn inc-iteration
-  [m]
-  (update m :iteration inc))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Page
 
@@ -97,13 +94,16 @@
 
 (defn run-kmean
   []
-    (go 
-      (dotimes [iteration 20] 
-        (<! (timeout 1000))
-        (swap! app-state assoc :iteration iteration)
-        (swap! app-state update-kmean)
-        (swap! app-state #(assoc % :clusters (assign-to-cluster (:points %) (map :centroid (:clusters %))))))))
+  (go 
+    (dotimes [iteration 10] 
+      (<! (timeout 1000))
+      (swap! app-state assoc :iteration (inc iteration))
+      (swap! app-state update-kmean)
+      (swap! app-state #(assoc % :clusters (assign-to-cluster (:points %) (map :centroid (:clusters %))))))))
 
+(defn reset-app-state 
+  []
+  (reset! app-state (initial-app-state)))
 
 (defn update-k 
   [event]
@@ -116,6 +116,7 @@
     [:label {:for "kvalue"} "K value: "]
     [:input {:type "number" :id "kvalue" :value (:k @ratom) :on-change update-k}]
     [:button {:on-click run-kmean} "Run kmeans"]
+    [:button {:on-click reset-app-state} "Reset"]
     [:span (str " Iteration: " (:iteration @ratom))]]] )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
