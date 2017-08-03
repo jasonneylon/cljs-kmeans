@@ -1,9 +1,9 @@
 (ns cljs-kmeans.core
+  (:use-macros [cljs.core.async.macros :only [go]])
   (:require
-   [reagent.core :as reagent]
-   [devtools.core :as devtools]
-   ))
-
+    [reagent.core :as reagent]
+    [devtools.core :as devtools]
+    [cljs.core.async :refer [<! chan close!]]))
 
 (def cluster-colors ["red",  "range",  "yellow",  "green",  "purple",  "brown"])
 
@@ -12,7 +12,6 @@
 
 (defn random-points []
   (take 200 (repeatedly random-point)))
-
 
 (defn distance [a b]
   (.sqrt 
@@ -33,6 +32,15 @@
      (map (fn [[centroid groups]] {:centroid centroid :points (map :point groups)}))
      assign-colors))
 
+
+(defn mean
+  [numbers]
+  (/  (apply + numbers)  (count numbers)))
+
+(defn mean-point
+  [points]
+  {:x (mean (map :x points)) :y (mean (map :y points))})
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Vars
 
@@ -46,6 +54,8 @@
   (reagent/atom
    {:points rps
     :k k
+    :running false
+    :iteration 0
     ; :clusters [{:centroid  {:x 1 :y 2}},  {:centroid  {:x 2 :y 1}}]
     :clusters (assign-to-cluster rps centroids)})))
 
@@ -64,15 +74,49 @@
 (defn graph [ratom]
   [:svg {:x 0 :y 0 :width 1000 :height 500}
    ; (draw-points (:points @ratom))
-   (draw-clusters (:clusters @ratom))
-   ])
+   (draw-clusters (:clusters @ratom))])
 
+
+(defn update-kmean 
+  [m]
+  (update 
+    m :clusters 
+    (fn [clusters]
+      (map #(assoc % :centroid (mean-point (:points %))) clusters))))
+
+(defn inc-iteration
+  [m]
+  (update m :iteration inc))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Page
 
-(defn page [ratom]
-  [:div [:h1 "K-means"] (graph ratom)] )
+(defn timeout [ms]
+  (let  [c  (chan)]
+    (js/setTimeout  (fn  []  (close! c)) ms)
+    c))
 
+(defn run-kmean
+  []
+    (go 
+      (dotimes [iteration 20] 
+        (<! (timeout 1000))
+        (swap! app-state assoc :iteration iteration)
+        (swap! app-state update-kmean)
+        (swap! app-state #(assoc % :clusters (assign-to-cluster (:points %) (map :centroid (:clusters %))))))))
+
+
+(defn update-k 
+  [event]
+  (swap! app-state assoc :k (-> event .-target .-value)))
+
+(defn page [ratom]
+  [:div 
+   [:h1 "K-means in ClojureScript"] (graph ratom)
+   [:fieldset 
+    [:label {:for "kvalue"} "K value: "]
+    [:input {:type "number" :id "kvalue" :value (:k @ratom) :on-change update-k}]
+    [:button {:on-click run-kmean} "Run kmeans"]
+    [:span (str " Iteration: " (:iteration @ratom))]]] )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Initialize App
@@ -81,8 +125,7 @@
   (when debug?
     (enable-console-print!)
     (println "dev mode")
-    (devtools/install!)
-    ))
+    (devtools/install!)))
 
 (defn reload []
   (reagent/render [page app-state]

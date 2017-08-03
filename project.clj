@@ -19,7 +19,7 @@
 
   :profiles
   {:dev
-   {:dependencies []
+   {:dependencies [[org.clojure/core.async "0.3.443"]]
 
     :plugins      [[lein-figwheel "0.5.8"]]
     }}
